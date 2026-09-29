@@ -5,9 +5,18 @@
 
 ## Windows + NVIDIA GPU（かんたん）
 
-1. `windows\setup.bat` をダブルクリック（git が必要。uv は無ければ自動インストール。初回は数GBのダウンロード）
-2. `windows\start.bat` をダブルクリック → ブラウザで `http://localhost:7860` が開く（ボイスクローン）
-3. 声質をテキストで指定したい場合は `windows\start_voicedesign.bat`（`http://localhost:7861`）
+1. `windows\setup.bat` をダブルクリック（初回のみ。git が必要。uv は無ければ自動インストール。数GBのダウンロード）
+2. `windows\start.bat` をダブルクリック → 日本語UIがブラウザで開きます
+3. 本家の英語UIを使いたい場合は `start_original.bat`、声質をテキストで指定するUIは `start_voicedesign.bat`
+
+### 日本語UIの機能
+
+- **声の保存**: 参照音声をアップロードして名前を付け「この声を保存」→ 次回から「保存済みの声」から選ぶだけ（`voices\` フォルダに保存）
+- **長さの調整**: 生成後、スライダー（0.5〜2.0倍）で音程を変えずに尺を変更。離すと即反映
+- **字幕(SRT)出力**: 入力テキストを句読点で短く区切り、音声の無音区間に合わせて時間を割り当て。`outputs\` に音声と同名の `.srt` を保存（1行の最大文字数は画面で変更可）
+- 生成した音声・SRTは `outputs\` に保存されます
+
+※ `voices\` は自分の作業データです。ZIPを再ダウンロードして置き換えるときは、先にこのフォルダを退避してください。
 
 モデルは `hf_cache\` に保存されます。別モデルを使うなら `set MODEL=Aratako/Irodori-TTS-v4-Small` してから `setup.bat` / `start.bat` を実行してください。
 
@@ -40,7 +49,8 @@ scripts/infer.sh --text "こんにちは" --no-ref --output-wav "$PWD/outputs/b.
 scripts/infer.sh --text "こんにちは" --caption "落ち着いた、近い距離感の女性話者" --no-ref --output-wav "$PWD/outputs/c.wav"
 
 # Web UI
-scripts/gradio.sh           # http://localhost:7860 (ボイスクローン)
+scripts/gradio.sh ja        # 日本語UI http://localhost:7860
+scripts/gradio.sh           # 本家UI http://localhost:7860 (ボイスクローン)
 scripts/gradio.sh design    # http://localhost:7861 (VoiceDesign)
 ```
 

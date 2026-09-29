@@ -10,3 +10,4 @@ set "UPSTREAM_DIR=%ROOT%\Irodori-TTS"
 rem Keep model cache inside this folder (easy to delete / move)
 if not defined HF_HOME set "HF_HOME=%ROOT%\hf_cache"
 set "PATH=%USERPROFILE%\.local\bin;%PATH%"
+set "PYTHONUTF8=1"

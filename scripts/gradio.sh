@@ -5,6 +5,7 @@ set -euo pipefail
 source "$(dirname "$0")/env.sh"
 cd "$UPSTREAM_DIR"
 case "${1:-standard}" in
+  ja)     cd "$ROOT" && exec uv run --project "$UPSTREAM_DIR" --no-sync python app/app_ja.py --server-name "${HOST:-127.0.0.1}" --server-port "${PORT:-7860}" ;;
   design) exec uv run --no-sync python gradio_app_voicedesign.py --server-name "${HOST:-0.0.0.0}" --server-port "${PORT:-7861}" ;;
   *)      exec uv run --no-sync python gradio_app.py --server-name "${HOST:-0.0.0.0}" --server-port "${PORT:-7860}" ;;
 esac
