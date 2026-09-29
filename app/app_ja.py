@@ -235,7 +235,7 @@ def build_ui() -> gr.Blocks:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--server-name", default="127.0.0.1")
-    ap.add_argument("--server-port", type=int, default=7860)
+    ap.add_argument("--server-port", type=int, default=None, help="未指定なら7860から空いているポートを自動選択")
     ap.add_argument("--open", action="store_true", help="起動後にブラウザを開く")
     args = ap.parse_args()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
