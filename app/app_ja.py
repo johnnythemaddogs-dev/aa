@@ -86,7 +86,7 @@ def _num(raw, cast, label):
         raise gr.Error(f"{label}は数値で入力してください。") from exc
 
 
-def generate(text, voice, uploaded, caption, seed_raw, steps_raw, cfg_text, cfg_speaker,
+def generate(text, voice, uploaded, caption, seed_raw, steps_raw, cfg_text, cfg_speaker, cfg_caption,
              precision, scale, max_chars, strip_punct, progress=gr.Progress()):
     text = (text or "").strip()
     if not text:
@@ -123,7 +123,9 @@ def generate(text, voice, uploaded, caption, seed_raw, steps_raw, cfg_text, cfg_
         seed=seed,
         num_steps=steps,
         cfg_scale_text=float(cfg_text),
-        cfg_scale_speaker=float(cfg_speaker),
+        cfg_scale_caption=float(cfg_caption),
+        # 参照音声がないとき話者ガイダンスを効かせると音が崩れるため、本家UIと同様に0にする
+        cfg_scale_speaker=float(cfg_speaker) if ref else 0.0,
         trim_tail=True,
     ), log_fn=lambda m: print(m, flush=True))
 
@@ -170,6 +172,7 @@ def build_ui() -> gr.Blocks:
                                                 info="bf16は高速・省メモリですが、CPUでは使えません")
                     cfg_text = gr.Slider(0, 10, value=3.0, step=0.1, label="テキストへの忠実さ")
                     cfg_speaker = gr.Slider(0, 10, value=5.0, step=0.1, label="参照音声への近さ")
+                    cfg_caption = gr.Slider(0, 10, value=4.0, step=0.1, label="声のイメージ指示への忠実さ")
                 gen_btn = gr.Button("音声を生成", variant="primary", size="lg")
 
             with gr.Column(scale=5):
@@ -192,7 +195,7 @@ def build_ui() -> gr.Blocks:
         post_out = [out_audio, info, srt_text, srt_file]
         gen_btn.click(
             generate,
-            [text, voice, uploaded, caption, seed, steps, cfg_text, cfg_speaker,
+            [text, voice, uploaded, caption, seed, steps, cfg_text, cfg_speaker, cfg_caption,
              precision, scale, max_chars, strip_punct],
             [out_audio, orig_state, text_state, info, srt_text, srt_file],
         )
