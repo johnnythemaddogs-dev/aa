@@ -97,6 +97,19 @@ def _split_long(sentence: str, max_chars: int) -> list[str]:
     return out
 
 
+def chunk_text(text: str, max_chars: int = 50) -> list[str]:
+    """TTS用に、文の区切りを保ったまま max_chars 程度のかたまりに分ける。"""
+    max_chars = max(10, int(max_chars))
+    chunks: list[str] = []
+    for sent in _split_sentences(text):
+        for piece in _split_long(sent, max_chars):
+            if chunks and len(chunks[-1]) + len(piece) <= max_chars:
+                chunks[-1] += piece
+            else:
+                chunks.append(piece)
+    return chunks
+
+
 def _weight(raw: str) -> float:
     w = 0.0
     for ch in raw:
@@ -193,6 +206,20 @@ def build_cues(text: str, y: np.ndarray, sr: int, max_chars: int = 14, strip_pun
             bounds.append(max(target, bounds[-1] + 0.15))
     bounds.append(end)
     return [Cue(bounds[i], max(bounds[i + 1], bounds[i] + 0.1), items[i][0]) for i in range(len(items))]
+
+
+def build_cues_segmented(segments, y: np.ndarray, sr: int, max_chars: int = 14,
+                         strip_punct: bool = True, time_scale: float = 1.0) -> list[Cue]:
+    """segments=[(text,start,end)] (元音声の秒)。各区間の実際の位置で字幕を作る。"""
+    cues: list[Cue] = []
+    for text, st, en in segments:
+        a, b = int(st * time_scale * sr), int(en * time_scale * sr)
+        part = y[a:b]
+        if len(part) < sr * 0.05:
+            continue
+        for c in build_cues(text, part, sr, max_chars, strip_punct):
+            cues.append(Cue(c.start + a / sr, c.end + a / sr, c.text))
+    return cues
 
 
 def _ts(sec: float) -> str:

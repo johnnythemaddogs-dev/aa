@@ -20,7 +20,7 @@ if str(IRODORI_DIR) not in sys.path:
 
 import voices  # noqa: E402
 from audiofx import time_stretch  # noqa: E402
-from subtitles import build_cues, to_srt  # noqa: E402
+from subtitles import build_cues_segmented, chunk_text, to_srt  # noqa: E402
 
 OUT_DIR = ROOT / "outputs"
 MODEL = os.environ.get("MODEL", "Aratako/Irodori-TTS-v4.1-Small")
@@ -54,12 +54,13 @@ def preview_voice(name: str):
 
 
 # ---------------------------------------------------------------- 後処理 (尺・SRT)
-def postprocess(orig_path, text, scale, max_chars, strip_punct):
-    if not orig_path:
+def postprocess(gen, scale, max_chars, strip_punct):
+    """gen = {"path": 元wav, "segments": [[text, start, end], ...]}"""
+    if not gen:
         return gr.skip(), gr.skip(), gr.skip(), gr.skip()
-    y, sr = sf.read(orig_path, dtype="float32", always_2d=False)
+    y, sr = sf.read(gen["path"], dtype="float32", always_2d=False)
     scale = float(scale)
-    orig = Path(orig_path)
+    orig = Path(gen["path"])
     if abs(scale - 1.0) < 1e-3:
         final_path = orig
         y2 = y
@@ -67,7 +68,8 @@ def postprocess(orig_path, text, scale, max_chars, strip_punct):
         y2 = time_stretch(y, 1.0 / scale)  # 長さ倍率 scale → 速さ 1/scale
         final_path = orig.with_name(f"{orig.stem}_x{scale:.2f}.wav")
         sf.write(final_path, y2, sr)
-    cues = build_cues(text, y2, sr, int(max_chars), bool(strip_punct))
+    cues = build_cues_segmented(gen["segments"], y2, sr, int(max_chars), bool(strip_punct),
+                                time_scale=len(y2) / len(y))
     srt_text = to_srt(cues)
     srt_path = final_path.with_suffix(".srt")
     srt_path.write_text(srt_text, encoding="utf-8")
@@ -87,7 +89,7 @@ def _num(raw, cast, label):
 
 
 def generate(text, voice, uploaded, caption, seed_raw, steps_raw, cfg_text, cfg_speaker, cfg_caption,
-             precision, scale, max_chars, strip_punct, progress=gr.Progress()):
+             precision, chunk_chars, gap_sec, scale, max_chars, strip_punct, progress=gr.Progress()):
     text = (text or "").strip()
     if not text:
         raise gr.Error("読み上げるテキストを入力してください。")
@@ -98,7 +100,7 @@ def generate(text, voice, uploaded, caption, seed_raw, steps_raw, cfg_text, cfg_
     try:
         from irodori_tts.inference_runtime import (
             RuntimeKey, SamplingRequest, default_runtime_device,
-            download_hf_checkpoint, get_cached_runtime, save_wav,
+            download_hf_checkpoint, get_cached_runtime,
         )
     except ImportError as exc:
         raise gr.Error(f"Irodori-TTS が見つかりません。setup.bat を実行してください。({exc})") from exc
@@ -114,42 +116,63 @@ def generate(text, voice, uploaded, caption, seed_raw, steps_raw, cfg_text, cfg_
     )
     runtime, _ = get_cached_runtime(key)
 
-    progress(0.3, desc="音声を生成中")
-    result = runtime.synthesize(SamplingRequest(
-        text=text,
-        caption=(caption or "").strip() or None,
-        ref_wavs=[ref] if ref else None,
-        no_ref=ref is None,
-        seed=seed,
-        num_steps=steps,
-        cfg_scale_text=float(cfg_text),
-        cfg_scale_caption=float(cfg_caption),
-        # 参照音声がないとき話者ガイダンスを効かせると音が崩れるため、本家UIと同様に0にする
-        cfg_scale_speaker=float(cfg_speaker) if ref else 0.0,
-        trim_tail=True,
-    ), log_fn=lambda m: print(m, flush=True))
+    chunks = chunk_text(text, int(chunk_chars))
+    if not chunks:
+        raise gr.Error("読み上げるテキストがありません。")
+    parts: list[np.ndarray] = []
+    segments: list[list] = []
+    sr = None
+    pos = 0.0
+    used_seed = seed
+    for i, chunk in enumerate(chunks):
+        progress(0.1 + 0.8 * i / len(chunks), desc=f"音声を生成中 ({i + 1}/{len(chunks)})")
+        result = runtime.synthesize(SamplingRequest(
+            text=chunk,
+            caption=(caption or "").strip() or None,
+            ref_wavs=[ref] if ref else None,
+            no_ref=ref is None,
+            seed=used_seed,  # 2つ目以降は同じシードにして声質を揃える
+            num_steps=steps,
+            cfg_scale_text=float(cfg_text),
+            cfg_scale_caption=float(cfg_caption),
+            # 参照音声がないとき話者ガイダンスを効かせると音が崩れるため、本家UIと同様に0にする
+            cfg_scale_speaker=float(cfg_speaker) if ref else 0.0,
+            trim_tail=True,
+        ), log_fn=lambda m: print(m, flush=True))
+        used_seed = result.used_seed
+        sr = result.sample_rate
+        a = result.audios[0].float().cpu().numpy()
+        a = a[0] if a.ndim == 2 and a.shape[0] == 1 else (a.mean(axis=0) if a.ndim == 2 else a)
+        if parts:  # チャンク間の無音
+            gap = np.zeros(int(sr * float(gap_sec)), dtype=np.float32)
+            parts.append(gap)
+            pos += len(gap) / sr
+        segments.append([chunk, pos, pos + len(a) / sr])
+        parts.append(a.astype(np.float32))
+        pos += len(a) / sr
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    orig = save_wav(OUT_DIR / f"{stamp}.wav", result.audios[0].float(), result.sample_rate)
+    orig = OUT_DIR / f"{stamp}.wav"
+    sf.write(orig, np.concatenate(parts), sr)
+    gen = {"path": str(orig), "segments": segments}
 
-    progress(0.9, desc="字幕を作成中")
-    path, info, srt_text, srt_path = postprocess(str(orig), text, scale, max_chars, strip_punct)
-    info = f"{info} / シード: {result.used_seed}"
-    return path, str(orig), text, info, srt_text, srt_path
+    progress(0.95, desc="字幕を作成中")
+    path, info, srt_text, srt_path = postprocess(gen, scale, max_chars, strip_punct)
+    info = f"{info} / {len(chunks)} 分割で生成 / シード: {used_seed}"
+    return path, gen, info, srt_text, srt_path
 
 
 # ---------------------------------------------------------------- UI
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title="Irodori-TTS 日本語UI") as demo:
         gr.Markdown("# Irodori-TTS 音声生成\nテキストを読み上げ、長さの調整とショート動画用の字幕(SRT)出力までできます。")
-        orig_state = gr.State(None)
-        text_state = gr.State("")
+        gen_state = gr.State(None)
 
         with gr.Row():
             with gr.Column(scale=5):
                 text = gr.Textbox(label="読み上げるテキスト", lines=6,
-                                  placeholder="ここに文章を入力（約30秒分まで）")
+                                  placeholder="ここに文章を入力（長文は自動で分割して生成します）")
 
                 with gr.Group():
                     gr.Markdown("### 声の選択")
@@ -170,6 +193,10 @@ def build_ui() -> gr.Blocks:
                         steps = gr.Textbox(label="ステップ数（空欄で標準）")
                         precision = gr.Dropdown(label="計算精度", choices=["fp32", "bf16"], value="fp32",
                                                 info="bf16は高速・省メモリですが、CPUでは使えません")
+                    with gr.Row():
+                        chunk_chars = gr.Slider(20, 120, value=50, step=5, label="1回に生成する文字数",
+                                                info="長い文章は自動で文ごとに分けて生成し、つなげます。短いほど内容は正確ですが、間が増えます。")
+                        gap_sec = gr.Slider(0.0, 1.0, value=0.3, step=0.05, label="分割部分の無音（秒）")
                     cfg_text = gr.Slider(0, 10, value=3.0, step=0.1, label="テキストへの忠実さ")
                     cfg_speaker = gr.Slider(0, 10, value=5.0, step=0.1, label="参照音声への近さ")
                     cfg_caption = gr.Slider(0, 10, value=4.0, step=0.1, label="声のイメージ指示への忠実さ")
@@ -191,13 +218,13 @@ def build_ui() -> gr.Blocks:
         save_btn.click(save_voice_ui, [save_name, uploaded], [voice, uploaded, save_name])
         del_btn.click(delete_voice_ui, voice, voice)
 
-        post_in = [orig_state, text_state, scale, max_chars, strip_punct]
+        post_in = [gen_state, scale, max_chars, strip_punct]
         post_out = [out_audio, info, srt_text, srt_file]
         gen_btn.click(
             generate,
             [text, voice, uploaded, caption, seed, steps, cfg_text, cfg_speaker, cfg_caption,
-             precision, scale, max_chars, strip_punct],
-            [out_audio, orig_state, text_state, info, srt_text, srt_file],
+             precision, chunk_chars, gap_sec, scale, max_chars, strip_punct],
+            [out_audio, gen_state, info, srt_text, srt_file],
         )
         scale.release(postprocess, post_in, post_out)
         max_chars.release(postprocess, post_in, post_out)
