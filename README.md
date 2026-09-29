@@ -3,7 +3,15 @@
 [Aratako/Irodori-TTS](https://github.com/Aratako/Irodori-TTS)（Flow Matching ベースの日本語 TTS、v4 / v4.1 系）を
 すぐ使えるようにするセットアップ用ラッパーです。上流コードは `Irodori-TTS/` に取得されます（git 管理外）。
 
-## セットアップ
+## Windows + NVIDIA GPU（かんたん）
+
+1. `windows\setup.bat` をダブルクリック（git が必要。uv は無ければ自動インストール。初回は数GBのダウンロード）
+2. `windows\start.bat` をダブルクリック → ブラウザで `http://localhost:7860` が開く（ボイスクローン）
+3. 声質をテキストで指定したい場合は `windows\start_voicedesign.bat`（`http://localhost:7861`）
+
+モデルは `hf_cache\` に保存されます。別モデルを使うなら `set MODEL=Aratako/Irodori-TTS-v4-Small` してから `setup.bat` / `start.bat` を実行してください。
+
+## セットアップ（Linux / Mac）
 
 前提: `git`, [`uv`](https://docs.astral.sh/uv/)、Hugging Face へアクセスできるネットワーク。
 

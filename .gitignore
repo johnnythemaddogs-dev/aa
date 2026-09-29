@@ -1,3 +1,4 @@
 Irodori-TTS/
 outputs/
 .env
+hf_cache/
