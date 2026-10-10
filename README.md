@@ -21,6 +21,26 @@
 
 モデルは `hf_cache\` に保存されます。別モデルを使うなら `set MODEL=Aratako/Irodori-TTS-v4-Small` してから `setup.bat` / `start.bat` を実行してください。
 
+## 手相ショート動画（Instagram リール 9:16）
+
+`video/tesou_taiyousen.py` は、ナレーション wav と手のひら画像から 1080x1920 / 30fps の mp4 を作ります
+（台本「太陽線があるのにお金がない理由」用）。必要なのは `uv` だけで、TTS のセットアップは不要です。
+
+1. ナレーション `.wav` と手のひら画像 `.png` を **2つまとめて** `windows\make_tesou_video.bat` にドラッグ＆ドロップ
+2. wav と同じフォルダに `同じ名前.mp4` と、テロップの時間を書いた `同じ名前.srt` ができます
+
+内容: 冒頭は LINE 風の相談トーク画面 → 蓮・月・曼荼羅などの金色の線画アニメーション → 手のひら画像に太陽線を描くアニメーション → コメント欄で「太陽」→ 公式LINE への誘導。
+テロップは台本どおりの位置でだけ改行し（自動で折り返さない）、50代以上でも読みやすい大きめの太字＋縁取り＋暗い帯にしています。
+
+調整のしかた（コマンドプロンプトで `set` してから bat にドロップ、または直接 `python video\tesou_taiyousen.py 音声.wav 画像.png ...`）:
+
+| やりたいこと | 方法 |
+|---|---|
+| 動画を作る前に静止画で確認 | `set PREVIEW=1`（`--preview`）→ `名前_preview\` に各テロップの場面と `palm_grid.png`（目盛り付きの手のひら画像）ができる |
+| 太陽線の位置を直す | `palm_grid.png` の目盛りを見て `set SUNLINE=0.62,0.68 0.61,0.43`（`--sunline`。画像の左上0,0・右下1,1 の割合。2点以上、手首側→指側） |
+| テロップのタイミングを直す | 出力された `.srt` の時間を編集して `set TIMINGS=C:\...\名前.srt`（`--timings`） |
+| テロップの文言・改行 | `video/tesou_taiyousen.py` の `CUES`（`\n` が改行、`[ ]` が金色の強調） |
+
 ## セットアップ（Linux / Mac）
 
 前提: `git`, [`uv`](https://docs.astral.sh/uv/)、Hugging Face へアクセスできるネットワーク。

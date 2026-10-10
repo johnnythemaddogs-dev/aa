@@ -110,7 +110,7 @@ def chunk_text(text: str, max_chars: int = 50) -> list[str]:
     return chunks
 
 
-def _weight(raw: str) -> float:
+def weight(raw: str) -> float:
     w = 0.0
     for ch in raw:
         if ch in _PAUSE:
@@ -135,7 +135,7 @@ def split_cues(text: str, max_chars: int = 14, strip_punct: bool = True) -> list
             shown = _STRIP_PUNCT.sub("", piece) if strip_punct else piece
             shown = shown.strip()
             if shown:
-                cues.append((shown, _weight(piece)))
+                cues.append((shown, weight(piece)))
     return cues
 
 
@@ -177,18 +177,18 @@ def analyze_audio(y: np.ndarray, sr: int) -> tuple[float, float, list[tuple[floa
     return start, end, inner
 
 
-def build_cues(text: str, y: np.ndarray, sr: int, max_chars: int = 14, strip_punct: bool = True) -> list[Cue]:
-    items = split_cues(text, max_chars, strip_punct)
-    if not items:
+def align_weights(weights: list[float], y: np.ndarray, sr: int) -> list[tuple[float, float]]:
+    """重み(読みの長さの目安)の列を、音声の無音区間に合わせた (開始, 終了) の列にする。"""
+    if not weights:
         return []
     start, end, silences = analyze_audio(y, sr)
-    total = sum(w for _, w in items)
+    total = sum(weights)
     mids = [(s + e) / 2 for s, e in silences]
     used: set[int] = set()
     bounds = [start]
     cum = 0.0
     span = end - start
-    for k, (_, w) in enumerate(items[:-1]):
+    for w in weights[:-1]:
         cum += w
         target = start + span * cum / total
         window = min(0.7, 0.45 * span * w / total + 0.25)
@@ -205,7 +205,13 @@ def build_cues(text: str, y: np.ndarray, sr: int, max_chars: int = 14, strip_pun
         else:
             bounds.append(max(target, bounds[-1] + 0.15))
     bounds.append(end)
-    return [Cue(bounds[i], max(bounds[i + 1], bounds[i] + 0.1), items[i][0]) for i in range(len(items))]
+    return [(bounds[i], max(bounds[i + 1], bounds[i] + 0.1)) for i in range(len(weights))]
+
+
+def build_cues(text: str, y: np.ndarray, sr: int, max_chars: int = 14, strip_punct: bool = True) -> list[Cue]:
+    items = split_cues(text, max_chars, strip_punct)
+    spans = align_weights([w for _, w in items], y, sr)
+    return [Cue(s, e, t) for (t, _), (s, e) in zip(items, spans)]
 
 
 def build_cues_segmented(segments, y: np.ndarray, sr: int, max_chars: int = 14,
