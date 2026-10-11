@@ -1,0 +1,135 @@
+<title>ねこ編集デモ帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=M+PLUS+1p:wght@400;500;700&display=swap">
+<style>
+/* Layout: 用途別のセクション見出し＋5秒クリップのカードグリッド。カードは動画・名前・使った手法の3段 */
+:root {
+  --bg: #fbf6f7; --surface: #ffffff; --fg: #3a2a33; --muted: #7d6873;
+  --line: #ecdfe4; --accent: #d9487a; --accent-soft: #fbe3ec; --code: #f4ecef;
+  --display: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "M PLUS 1p", sans-serif;
+  --body: "M PLUS 1p", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1d171b; --surface: #272026; --fg: #f1e7ec; --muted: #b29fa9;
+  --line: #3a3037; --accent: #ff7aa6; --accent-soft: #42283a; --code: #322a30; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1d171b; --surface: #272026; --fg: #f1e7ec; --muted: #b29fa9;
+  --line: #3a3037; --accent: #ff7aa6; --accent-soft: #42283a; --code: #322a30; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--body); line-height: 1.7; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; }
+header { display: grid; gap: 10px; margin-bottom: 36px; max-width: 70ch; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--accent); font-weight: 700; }
+h1 { font-family: var(--display); font-weight: 900; font-size: clamp(30px, 5vw, 46px); line-height: 1.2; margin: 0; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.legend a { font-size: 13px; text-decoration: none; color: var(--fg); background: var(--accent-soft); padding: 4px 12px; border-radius: 999px; }
+.legend a:hover, .legend a:focus-visible { outline: 2px solid var(--accent); }
+section { margin-top: 44px; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 22px; margin: 0 0 4px; display: flex; align-items: baseline; gap: 10px; }
+h2 small { font-family: var(--body); font-weight: 500; font-size: 13px; color: var(--muted); }
+.sec-note { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.media { background: #000; aspect-ratio: 16 / 9; display: grid; place-items: center; }
+.media video, .media img { width: 100%; height: 100%; object-fit: contain; display: block; max-width: 100%; }
+.card.tall .media { aspect-ratio: 16 / 9; }
+.info { padding: 12px 16px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.name { font-family: var(--display); font-weight: 700; font-size: 17px; display: flex; gap: 8px; align-items: baseline; }
+.no { font-family: var(--mono); font-size: 12px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.what { font-size: 14px; margin: 0; }
+.how { font-family: var(--mono); font-size: 12px; color: var(--muted); background: var(--code); padding: 2px 8px; border-radius: 6px; justify-self: start; max-width: 100%; overflow-wrap: anywhere; }
+footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; max-width: 75ch; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">VIDEO EDITING DEMO · 31 CLIPS · 各約5秒</div>
+    <h1>猫の愛情表現で見る、動画編集31種</h1>
+    <p>猫の素材から音・ステッカーまで、すべてこのセッション内で自前生成し、ffmpeg で編集しました。カードにカーソルを合わせると（スマホはタップで）再生します。音付きのクリップは再生中に音量ボタンで音も聞けます。</p>
+    <nav class="legend" id="legend"></nav>
+  </header>
+  <main id="main"></main>
+  <footer>
+    素材の猫（まばたき・すりすり・ふみふみ・しっぽピーン・顔アップ・グリーンバック）は Python で描いたアニメーション、BGM・ゴロゴロ音・効果音は波形から合成しています。
+    手持ちの実写動画や音声を渡してもらえれば、同じ編集をそのまま適用できます。生成スクリプトはリポジトリの <code>video_demos/scripts/</code> にあります。
+  </footer>
+</div>
+
+<script>
+const SECTIONS = [
+  { id: "time", title: "時間をあやつる", note: "速さ・向き・止め方を変える編集", items: [
+    ["03","03_slowmo","スローモーション","まばたきの瞬間を0.5倍速に。音も同じ比率で伸ばしています。","setpts / atempo"],
+    ["04","04_interpolate","フレーム補間","コマを間引いた映像を、動きを推定してなめらかに補間。左右で比較。","minterpolate"],
+    ["05","05_fastforward","早送り","素材5本・約30秒を6倍速で5秒に。","setpts=PTS/6"],
+    ["06","06_reverse","逆再生","近づいてくる猫が後ずさり。音声も逆再生。","reverse / areverse"],
+    ["07","07_boomerang","ブーメラン","ふみふみを 順再生→逆再生 で往復ループ。","reverse + concat"],
+    ["24","24_speed_ramp","スピードランプ","2倍速 → 頭が触れる瞬間だけ0.4倍スロー → 2倍速。","trim + setpts"],
+    ["23","23_freeze_frame","フリーズフレーム","猫キスの瞬間で静止し、フラッシュ・ズーム・文字で強調。","loop / zoompan"],
+    ["27","27_stop_motion","コマ撮り風","6fps に落とし、わずかに揺らしてストップモーション風に。","fps / crop"],
+  ]},
+  { id: "structure", title: "つなぐ・構成する", note: "クリップの切り貼りと場面転換", items: [
+    ["01","01_cut","カット編集","3つの素材から見せ場だけを切り出してつなぐジャンプカット。","trim + concat"],
+    ["02","02_transition","トランジション","円形オープン・スライド・ラジアルの3種で場面転換。","xfade"],
+    ["21","21_fade","フェードイン・アウト","黒から入り、白へ抜ける。BGMも同時にフェード。","fade / afade"],
+    ["22","22_slideshow","写真スライドショー","静止画4枚にゆっくりズーム・パンをかけ、フェードでつなぐ。","zoompan + xfade"],
+    ["30","30_opening_title","オープニングタイトル","タイトルカードが出て、円形ワイプで本編へ。","drawtext + xfade"],
+    ["31","31_loop","ループGIF書き出し","SNSやチャット用に、色数を絞った無限ループGIFへ変換。","palettegen / paletteuse"],
+  ]},
+  { id: "frame", title: "画面を組み立てる", note: "構図・画面分割・向きの変更", items: [
+    ["08","08_zoom_pan","ズーム＆パン","引きの画から顔へ寄っていくケン・バーンズ効果。","zoompan"],
+    ["09","09_vertical","縦型（9:16）変換","横動画を縦に再構成。余白はぼかした映像で埋めます。","crop / boxblur / overlay"],
+    ["10","10_rotate_flip","回転・反転","元映像・左右反転・上下反転・回転を並べて比較。","hflip / vflip / rotate"],
+    ["15","15_pip","ピクチャー・イン・ピクチャー","メイン映像の右下に、顔アップの小窓がスライドイン。","overlay"],
+    ["16","16_split_screen","分割画面","4種類の愛情表現を2×2で同時に再生。","xstack"],
+    ["25","25_mirror","ミラー・万華鏡","左右対称ミラーから、4分割の万華鏡へ切り替え。","hflip / vflip / stack"],
+  ]},
+  { id: "look", title: "見た目を変える", note: "色・質感・フィルター", items: [
+    ["11","11_color_grade","カラーグレーディング","暖色の色調補正を、動く境界線でビフォー・アフター比較。","curves / colorbalance"],
+    ["12","12_film_retro","レトロフィルム風","セピア・粒子ノイズ・ちらつき・周辺減光・傷。音もこもらせています。","colorchannelmixer / noise"],
+    ["26","26_glitch","グリッチ","RGBずれ・ノイズ・走査線が一瞬だけ走るデジタル崩れ。","rgbashift"],
+    ["28","28_art_filters","アート系フィルター","線画風・ポスタライズ・ネガ反転・色相回転の4種。","edgedetect / lutrgb / hue"],
+    ["18","18_mosaic_blur","モザイク・ぼかし","顔まわりに部分モザイク、後半はぼかしに切り替え。","crop + scale / boxblur"],
+    ["19","19_stabilize","手ブレ補正","わざと揺らした映像を2パス解析で安定化。左右で比較。","vidstabdetect / vidstabtransform"],
+  ]},
+  { id: "text", title: "文字・音・合成", note: "伝えるための装飾と音づくり", items: [
+    ["13","13_telop","アニメーションテロップ","帯がせり上がり、文字がスライドイン。ハートが脈打つ。","drawtext / drawbox"],
+    ["14","14_subtitles","字幕（ASS・カラオケ）","フェード付き字幕と、色が流れるカラオケ字幕の焼き込み。","subtitles (ASS)"],
+    ["29","29_stickers","ステッカー合成","弾むハートと「だいすき」吹き出しが「ポン」と出現。","overlay / scale eval=frame"],
+    ["17","17_chromakey","クロマキー合成","グリーンバックの猫を、動くパステル背景に合成。","chromakey / despill"],
+    ["20","20_audio_mix","BGM・効果音ミックス","BGM・ゴロゴロ音・キラン音を重ね、ゴロゴロ中はBGMを下げる。波形も表示。","amix / sidechaincompress"],
+  ]},
+];
+
+const legend = document.getElementById("legend");
+const main = document.getElementById("main");
+for (const s of SECTIONS) {
+  const a = document.createElement("a");
+  a.href = "#" + s.id; a.textContent = `${s.title}（${s.items.length}）`;
+  legend.append(a);
+  const sec = document.createElement("section");
+  sec.id = s.id;
+  sec.innerHTML = `<h2>${s.title}<small>${s.items.length}本</small></h2><p class="sec-note">${s.note}</p><div class="grid"></div>`;
+  const grid = sec.querySelector(".grid");
+  for (const [no, file, name, what, how] of s.items) {
+    const card = document.createElement("article");
+    card.className = "card";
+    const isGif = file === "31_loop";
+    const media = isGif
+      ? `<img src="out/${file}.gif" alt="${name}" loading="lazy">`
+      : `<video src="out/${file}.mp4" poster="posters/${file}.jpg" muted loop playsinline controls preload="none" aria-label="${name}"></video>`;
+    card.innerHTML = `<div class="media">${media}</div>
+      <div class="info"><div class="name"><span class="no">No.${no}</span>${name}</div>
+      <p class="what">${what}</p><code class="how">${how}</code></div>`;
+    const v = card.querySelector("video");
+    if (v) {
+      card.addEventListener("mouseenter", () => v.play().catch(() => {}));
+      card.addEventListener("mouseleave", () => v.pause());
+    }
+    grid.append(card);
+  }
+  main.append(sec);
+}
+</script>
